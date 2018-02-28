@@ -1,3 +1,5 @@
+
+
 //GSEA plugin for PathVisio,
 
 //Gene set enrichment plugin 
@@ -26,15 +28,25 @@
 
 // limitations under the License.
 
+
 package org.pathvisio.ora.plugin;
+
+
+import java.awt.Color;
 import java.awt.EventQueue;
 
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
 import javax.swing.JButton;
 import javax.swing.JTextField;
+
+import org.pathvisio.desktop.PvDesktop;
+
 import java.awt.event.ActionListener;
 import java.io.File;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
 import java.awt.event.ActionEvent;
 
 /**
@@ -45,34 +57,38 @@ import java.awt.event.ActionEvent;
  * The user will return to this frame on several instances. 
  */
 
-public class MainFrameGSEA 
-{
+
+public class MainFrameGSEA {
 
 	private JFrame frame;
 	private JTextField txtGettingStarted;
+	private static JButton btnLoadData;
+	private static JButton btnSetRunConfiguration;
+	private static JButton btnRun;
+	private PvDesktop desktop;
+	
 
 	/**
 	 * Launch the application.
 	 */
-	
-			public void run() 
-			{
-				try 
-				{
+	public static void run() {
+		EventQueue.invokeLater(new Runnable() {
+			public void run() {
+				try {
 					MainFrameGSEA window = new MainFrameGSEA();
 					window.frame.setVisible(true);
-				} catch (Exception e) 
-				{
+				} catch (Exception e) {
 					e.printStackTrace();
 				}
 			}
-		
-	
+		});
+	}
 
 	/**
 	 * Create the application.
 	 */
-	public MainFrameGSEA() {
+	public MainFrameGSEA() 
+	{
 		initialize();
 	}
 
@@ -86,6 +102,7 @@ public class MainFrameGSEA
 		frame = new JFrame();
 		frame.setBounds(100, 100, 450, 300);
 		frame.getContentPane().setLayout(null);
+		//setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 		
 		
 		//Create Title
@@ -94,38 +111,87 @@ public class MainFrameGSEA
 		txtGettingStarted.setBounds(170, 13, 94, 22);
 		frame.getContentPane().add(txtGettingStarted);
 		txtGettingStarted.setColumns(10);
+		txtGettingStarted.setEditable(false);
+		
 		
 		//Create "load" button, "configuration" button and "run" button
 		//Set "run" button and "configuration" button on false 
 		
-		JButton btnLoadData = new JButton("Load Data");
+		btnLoadData = new JButton("Load Data");
 		btnLoadData.setBounds(105, 69, 94, 79);
 		frame.getContentPane().add(btnLoadData);
 		
-		JButton btnSetRunConfiguration = new JButton("Set run configuration");
+		btnSetRunConfiguration = new JButton("Set run configuration");
 		btnSetRunConfiguration.setBounds(239, 69, 94, 79);
 		frame.getContentPane().add(btnSetRunConfiguration);
 		btnSetRunConfiguration.setEnabled(false);
 		
-		JButton btnRun = new JButton("Run");
+		btnRun = new JButton("Run");
 		btnRun.setBounds(170, 188, 97, 25);
 		frame.getContentPane().add(btnRun);
 		btnRun.setEnabled(false);
 		
 		//From here on are the actionListeners
 		
-		//Opens the load data page when Load button is pressed.
+		//Opens the load data page when button is pressed.
 		
 		btnLoadData.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) 
 			{
 				//JOptionPane.showMessageDialog(null,"Load data page");
 				
-				//LoadDataPage LoadObject = new LoadDataPage();
-				//LoadObject.Run();
-				LoadDataPage LoadData = new LoadDataPage();
-				LoadData.run();
+				LoadDataPage loadData = new LoadDataPage(desktop);
+				loadData.run();
+			}
+		});
+		
+		//Opens the SetConfigurationsPage when button is pressed.
+		btnSetRunConfiguration.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) 
+			{
+				SetConfigPage setConfig = new SetConfigPage();
+				setConfig.run();
+			}
+		});
+		
+		btnRun.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0)
+			{
+				RunPage runPage = new RunPage();
+				runPage.run();
 			}
 		});
 	}
+	
+	public static void enableSetButton()
+	{
+		btnSetRunConfiguration.setEnabled(true);
+	}
+	
+	public static void enableRunButton()
+	{
+		btnRun.setEnabled(true);
+	}
+	
+
+	public static void colorLoadButtonGreen()
+	{
+		btnLoadData.setBackground(Color.GREEN);
+	}
+	public static void colorSetButtonGreen()
+	{
+		btnSetRunConfiguration.setBackground(Color.GREEN);
+	}
+	
+	
+	public static void disableLoadButton()
+	{
+		btnLoadData.setEnabled(false);
+	}
+	public static void disableSetButton()
+	{
+		btnSetRunConfiguration.setEnabled(false);
+	}
+	
+	
 }

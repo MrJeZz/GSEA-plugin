@@ -28,9 +28,6 @@
 
 package org.pathvisio.ora.plugin;
 
-
-
-
 import java.awt.BorderLayout;
 import java.awt.EventQueue;
 
@@ -38,25 +35,51 @@ import javax.swing.JFrame;
 import javax.swing.JFileChooser;
 import javax.swing.JPanel;
 import javax.swing.border.EmptyBorder;
+
+import org.bridgedb.DataSource;
+import org.bridgedb.IDMapper;
+import org.bridgedb.IDMapperException;
+import org.bridgedb.Xref;
+import org.pathvisio.core.data.XrefWithSymbol;
+import org.pathvisio.core.util.PathwayParser;
+import org.pathvisio.core.util.PathwayParser.ParseException;
+import org.pathvisio.desktop.PvDesktop;
+import org.xml.sax.SAXException;
+import org.xml.sax.XMLReader;
+import org.xml.sax.helpers.XMLReaderFactory;
+
+//import jxl.Cell;
+//import jxl.CellType;
+//import jxl.Sheet;
+//import jxl.Workbook;
+//import jxl.read.biff.BiffException;
+
 import javax.swing.JTextField;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import java.awt.Color;
 import java.awt.event.ActionListener;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.awt.event.ActionEvent;
 import javax.swing.JRadioButton;
 import javax.swing.JSeparator;
 import javax.swing.JList;
+import javax.swing.JOptionPane;
 import javax.swing.ButtonGroup;
+
 
 /**
  * @ Jesse
  * 
  *   This represents the Load data page where a genesetfile, a dataset file or a preranked list,
- *   and a phenotype file can be upoaded. It is also possible to select the phenotypes manually instead of
+ *   and a phenotype file can be uploaded. It is also possible to select the phenotypes manually instead of
  *   using the phenotype file.
  * 
  */
@@ -70,6 +93,9 @@ public class LoadDataPage extends JFrame {
 	private JTextField txtSelectGS;
 	private JTextField txtGSPath;
 	private JButton browseGS;
+	private JTextField txtSelectPW;
+	private JTextField txtPWPath;
+	private JButton browsePW;
 	private JTextField txtDSPath;
 	private File geneSetsFile;
 	private File dataSetFile;
@@ -80,12 +106,22 @@ public class LoadDataPage extends JFrame {
 	private JTextField txtLoadedFiles;
 	
 	public static List<String> namesTemp = new ArrayList<String>();
+	public static List<String> geneNames;
 	public static String geneSetsFileName;
 	public static String dataSetFileName;
 	public static String phenotypeFileName;
 	public static String preRankedFileName;
+	public static Boolean preRanked = false;
+	public static JButton doneLoad = new JButton("Done");
+	public static JList<String> listLoadedFileNames = new JList<String>(new DefaultListModel<String>());
+	public static ArrayList<HashMap<String, double[]>> mylist = new ArrayList<HashMap<String, double[]>>();
+    public static HashMap<String, double[]> map = new HashMap<String, double[]>();
 	private final ButtonGroup buttonGroup = new ButtonGroup();
 	private final ButtonGroup buttonGroup_1 = new ButtonGroup();
+	private final ButtonGroup buttonGroup_2 = new ButtonGroup();
+	
+	private final PvDesktop desktop;
+	
 	
 	
 
@@ -96,7 +132,7 @@ public class LoadDataPage extends JFrame {
 		EventQueue.invokeLater(new Runnable() {
 			public void run() {
 				try {
-					LoadDataPage frame = new LoadDataPage();
+					LoadDataPage frame = new LoadDataPage(desktop);
 					frame.setVisible(true);
 				} catch (Exception e) {
 					e.printStackTrace();
@@ -108,7 +144,10 @@ public class LoadDataPage extends JFrame {
 	/**
 	 * Create the frame.
 	 */
-	public LoadDataPage() {
+	public LoadDataPage(PvDesktop desktop) {
+		
+		this.desktop = desktop;
+		
 		//setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		setBounds(300, 300, 787, 719);
 		contentPane = new JPanel();
@@ -124,13 +163,21 @@ public class LoadDataPage extends JFrame {
 		title.setColumns(10);
 		title.setEditable(false);
 		
-		//Create "Select gene sets" text
+		/*//Create "Select gene sets" text
 		txtSelectGS = new JTextField();
 		txtSelectGS.setBounds(12, 35, 199, 22);
 		txtSelectGS.setBackground(Color.GRAY);
 		txtSelectGS.setText("Select Gene Set  ");
 		contentPane.add(txtSelectGS);
 		txtSelectGS.setColumns(10);
+		
+		//Create "Select gene sets" text
+		txtSelectPW = new JTextField();
+		txtSelectPW.setBounds(426, 35, 199, 22);
+		txtSelectPW.setBackground(Color.GRAY);
+		txtSelectPW.setText("Select pathway file  ");
+		contentPane.add(txtSelectPW);
+		txtSelectPW.setColumns(10);*/
 		
 		//Create "Loaded files" text
 		txtLoadedFiles = new JTextField();
@@ -141,17 +188,23 @@ public class LoadDataPage extends JFrame {
 		
 		//Create text fields to show paths of loaded files
 		txtGSPath = new JTextField();
-		txtGSPath.setBounds(12, 63, 286, 22);
+		txtGSPath.setBounds(12, 63, 223, 22);
 		contentPane.add(txtGSPath);
 		txtGSPath.setColumns(10);
 		txtGSPath.setEditable(false);
 		
-		txtDSPath = new JTextField();
+		txtPWPath = new JTextField();
+		txtPWPath.setBounds(426, 63, 223, 22);
+		contentPane.add(txtPWPath);
+		txtPWPath.setColumns(10);
+		txtPWPath.setEditable(false);
+		
+	/*	txtDSPath = new JTextField();
 		txtDSPath.setBounds(12, 173, 223, 22);
 		contentPane.add(txtDSPath);
 		txtDSPath.setColumns(10);
 		txtDSPath.setEnabled(false);
-		txtDSPath.setEditable(false);
+		txtDSPath.setEditable(false);*/
 		
 		txtPLPath = new JTextField();
 		txtPLPath.setColumns(10);
@@ -182,13 +235,19 @@ public class LoadDataPage extends JFrame {
 		
 		//create browse buttons
 		browseGS = new JButton("Browse");
-		browseGS.setBounds(310, 62, 97, 25);	
+		browseGS.setBounds(244, 62, 97, 25);	
 		contentPane.add(browseGS);
+		browseGS.setEnabled(false);
 		
-		JButton browseDS = new JButton("Browse");
+		browsePW = new JButton("Browse");
+		browsePW.setBounds(660, 62, 97, 25);	
+		contentPane.add(browsePW);
+		browsePW.setEnabled(false);
+		
+		/*JButton browseDS = new JButton("Browse");
 		browseDS.setBounds(244, 172, 97, 25);
 		contentPane.add(browseDS);
-		browseDS.setEnabled(false);
+		browseDS.setEnabled(false);*/
 		
 		JButton browsePL = new JButton("Browse");
 		browsePL.setBounds(660, 172, 97, 25);
@@ -208,10 +267,15 @@ public class LoadDataPage extends JFrame {
 		loadGS.setBounds(12, 83, 97, 25);
 		contentPane.add(loadGS);
 		
-		JButton loadDS = new JButton("Load");
+		JButton loadPW = new JButton("Load");
+		loadPW.setEnabled(false);
+		loadPW.setBounds(426, 83, 97, 25);
+		contentPane.add(loadPW);
+		
+		/*JButton loadDS = new JButton("Load");
 		loadDS.setBounds(12, 195, 97, 25);
 		contentPane.add(loadDS);
-		loadDS.setEnabled(false);
+		loadDS.setEnabled(false);*/
 		
 		JButton loadPL = new JButton("Load");
 		loadPL.setBounds(426, 195, 97, 25);
@@ -231,14 +295,28 @@ public class LoadDataPage extends JFrame {
 		manualSelection.setEnabled(false);
 		
 		//create done button
-		JButton done = new JButton("Done");
-		done.setBounds(340, 621, 97, 25);
-		contentPane.add(done);
-		done.setEnabled(false);
+		//JButton doneLoad = new JButton("Done");
+		doneLoad.setBounds(340, 621, 97, 25);
+		contentPane.add(doneLoad);
+		doneLoad.setEnabled(false);
 		
 	    
 		//create radiobuttons
-	    JRadioButton rdbtnUseExpressionDataset = new JRadioButton("Use Expression Dataset");
+		
+		JRadioButton rdbtnUseGeneset = new JRadioButton("Use Geneset");
+		rdbtnUseGeneset.setEnabled(true);
+	    buttonGroup_2.add(rdbtnUseGeneset);
+	    rdbtnUseGeneset.setBounds(12, 29, 267, 25);
+		contentPane.add(rdbtnUseGeneset);
+		
+
+		JRadioButton rdbtnUsePathwayFile = new JRadioButton("Use Pathway file");
+		rdbtnUsePathwayFile.setEnabled(true);
+	    buttonGroup_2.add(rdbtnUsePathwayFile);
+	    rdbtnUsePathwayFile.setBounds(426, 29, 215, 25);
+		contentPane.add(rdbtnUsePathwayFile);
+		
+	    JRadioButton rdbtnUseExpressionDataset = new JRadioButton("Use loaded Expression Dataset");
 	    rdbtnUseExpressionDataset.setEnabled(false);
 	    buttonGroup.add(rdbtnUseExpressionDataset);
 		rdbtnUseExpressionDataset.setBounds(12, 139, 267, 25);
@@ -267,7 +345,7 @@ public class LoadDataPage extends JFrame {
 		
 		
 		//create JList for displaying the files that have been loaded
-		JList<String> listLoadedFileNames = new JList<String>(new DefaultListModel<String>());
+		
 		listLoadedFileNames.setBounds(0, 439, 769, 128);
 		contentPane.add(listLoadedFileNames);
 		
@@ -347,14 +425,15 @@ public class LoadDataPage extends JFrame {
 		{
 			public void actionPerformed(ActionEvent arg0) 
 			{
-				Methods m = new Methods();
 				
-				m.reader2(geneSetsFile);
-				m.store(geneSetsFile,namesTemp);
+				
+				//m.reader2(geneSetsFile);
 				geneSetsFileName = geneSetsFile.getName();
 				((DefaultListModel)listLoadedFileNames.getModel()).addElement(geneSetsFileName);
 				rdbtnUsePrerankedList.setEnabled(true);
 				rdbtnUseExpressionDataset.setEnabled(true);
+				
+				
 				
 				
 			}
@@ -367,7 +446,7 @@ public class LoadDataPage extends JFrame {
 			public void actionPerformed(ActionEvent arg0) 
 			{
 				txtDSPath.setEnabled(true);
-				browseDS.setEnabled(true);
+				//browseDS.setEnabled(true);
 				txtPLPath.setEnabled(false);
 				browsePL.setEnabled(false);
 				loadPL.setEnabled(false);
@@ -376,7 +455,7 @@ public class LoadDataPage extends JFrame {
 		});
 		
 		//Filechooser action for the data set browse button
-		browseDS.addActionListener(new ActionListener() 
+	/*	browseDS.addActionListener(new ActionListener() 
 		{
 			public void actionPerformed(ActionEvent e)
 			{
@@ -385,12 +464,13 @@ public class LoadDataPage extends JFrame {
 				dataSetFile = chooser.getSelectedFile();
 				String pathOfFile =dataSetFile.getAbsolutePath();
 				txtDSPath.setText(pathOfFile);
+				dataSetFileName = dataSetFile.getName();
 			}
-		});
+		});*/
 		
 		
 		//Actionlistener  to ensure that load is only set active when text is present in the "txtDSPath"
-		final ActionListener actionListener2 = new ActionListener()
+	/*	final ActionListener actionListener2 = new ActionListener()
         {
             public void actionPerformed(ActionEvent e)
             {
@@ -433,22 +513,78 @@ public class LoadDataPage extends JFrame {
         };
 
         new Thread(target2).start();
-        txtDSPath.addActionListener(actionListener2);
+        txtDSPath.addActionListener(actionListener2);*/
 		
 		
 		
         // Load button action for expression dataset --> adds the name of the file to the created JList for display
-		loadDS.addActionListener(new ActionListener()
+		/*loadDS.addActionListener(new ActionListener()
 		{
-			public void actionPerformed(ActionEvent e) 
+			public void actionPerformed(ActionEvent e)
 			{
-				dataSetFileName = dataSetFile.getName();
+				Methods m = new Methods();
+				
+				
+				System.out.println(dataSetFileName);
 				((DefaultListModel)listLoadedFileNames.getModel()).addElement(dataSetFileName);
-				rdbtnUsePrerankedList.setEnabled(false);
+				//Stores gene names in list namesTemp for later use
+				
+				if(dataSetFile.exists())
+				System.out.println("true1");
+				else 
+				System.out.println("false1");	
+					
+				if(dataSetFile.isFile())
+				System.out.println("true2");
+				else
+				System.out.println("false2");
+				if(dataSetFile.canRead())
+			    System.out.println("true3");
+				else
+				System.out.println("false3");
+				
+			
+				
+				//geneNames = readExDS();
+						
+				/*try {
+					m.store2(dataSetFileName,namesTemp);
+				} catch (IOException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}*/
+				
+				/*File inputWorkbook = dataSetFile;
+			    Workbook w;
+			    try 
+			    {
+			        w = Workbook.getWorkbook(inputWorkbook);
+			        // Get the first sheet
+			        Sheet sheet = w.getSheet(0);
+			        // Loop over first 10 column and lines
+			        
+			        for (int j = 2; j < sheet.getColumns(); j++) 
+			        {
+			        	Cell cell = sheet.getCell(j, 2);
+			        	CellType type = cell.getType();
+			        	System.out.println("I got a label "+ cell.getContents());
+				
+			        } 
+			    } 
+			    
+			    catch (BiffException e1)
+			    {
+			        e1.printStackTrace();
+			    } catch (IOException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}*/
+				
+				/*rdbtnUsePrerankedList.setEnabled(false);
 				rdbtnSelectPhentypeFile.setEnabled(true);
 				rdbtnSelectPhenotypeManually.setEnabled(true);
 			}
-		});
+		}); */
 		
 		
 		
@@ -458,8 +594,8 @@ public class LoadDataPage extends JFrame {
 			public void actionPerformed(ActionEvent e) 
 			{
 				txtDSPath.setEnabled(false);
-				browseDS.setEnabled(false);
-				loadDS.setEnabled(false);
+				//browseDS.setEnabled(false);
+				//loadDS.setEnabled(false);
 				txtPLPath.setEnabled(true);
 				browsePL.setEnabled(true);
 			}
@@ -530,8 +666,10 @@ public class LoadDataPage extends JFrame {
 			{
 				preRankedFileName= preRankedList.getName();
 				((DefaultListModel)listLoadedFileNames.getModel()).addElement(preRankedFileName);
-				done.setEnabled(true);
+				doneLoad.setEnabled(true);
 				rdbtnUseExpressionDataset.setEnabled(false);
+				preRanked = true;
+				
 				
 			}
 		});
@@ -617,13 +755,13 @@ public class LoadDataPage extends JFrame {
 				phenotypeFileName = phenotypeFile.getName();
 				((DefaultListModel)listLoadedFileNames.getModel()).addElement(phenotypeFileName);
 				rdbtnSelectPhenotypeManually.setEnabled(false);
-				done.setEnabled(true);
+				doneLoad.setEnabled(true);
 				
 			}
 		});
 		
 		
-     // Radiobutton action for the prerankedlist --> enables manual selection button, disables txtPFPath, loadPF and browsePF
+     // Radiobutton action for select phenotypes manually --> enables manual selection button, disables txtPFPath, loadPF and browsePF
 		rdbtnSelectPhenotypeManually.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0)
 			{
@@ -635,19 +773,124 @@ public class LoadDataPage extends JFrame {
 			}
 		});
 		
+		manualSelection.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) 
+			{
+				ManualSelectionPage manual = new ManualSelectionPage();
+				manual.run();
+			}
+		});
 		
-	//done button 
-		done.addActionListener(new ActionListener() 
+		
+	//done button  
+		doneLoad.addActionListener(new ActionListener() 
 		{
 			public void actionPerformed(ActionEvent e) 
 			{
 				
+				MainFrameGSEA.enableSetButton();
+				MainFrameGSEA.colorLoadButtonGreen();
+				MainFrameGSEA.disableLoadButton();
+				dispose();
 				
-				//Methods m = new Methods();
+				////Methods m = new Methods();
 				
 				//m.reader2(geneSet);
 			}
 		});
 		
 	}
+	
+	//Methods
+	
+	
+	public List<String> openPathway(File gpmlFile, IDMapper sgdb, DataSource targetDs) throws ParseException, SAXException, IDMapperException, IOException{
+		List<String> geneSet = new ArrayList<String>();
+		try
+		{
+			XMLReader xmlReader = XMLReaderFactory.createXMLReader();
+			PathwayParser pwyParser = new PathwayParser(gpmlFile, xmlReader);
+			for (XrefWithSymbol ref : pwyParser.getGenes()) 
+			{
+				for (Xref dest : sgdb.mapID(ref.asXref(), targetDs)) {
+					geneSet.add(dest.getId());
+				}
+			}
+		}
+		catch(ParseException ex) {
+			JOptionPane.showMessageDialog(null, "Error: Enable to open pathway " + ex.getMessage(),
+					"Error", JOptionPane.ERROR_MESSAGE);
+		}
+		return geneSet;
+	}
+	
+	/*public List<String> readExDS()
+	{
+		File inputWorkbook = dataSetFile;
+	    Workbook w;
+        Cell cell;
+        List<String> geneNames1 = new ArrayList<String>();
+       // String[] geneNames1 = null;
+       
+	    try 
+	    {
+	        w = Workbook.getWorkbook(inputWorkbook);
+	        // Get the first sheet
+	        Sheet sheet = w.getSheet(0);
+	        // Loop over first 10 column and lines
+	        
+	       
+	        int j ;
+	        for (j = 2; j < sheet.getColumns(); j++) 
+	        {
+	        	cell = sheet.getCell(j, 2);
+	        	CellType type = cell.getType();
+	        	System.out.println("I got a label "+ cell.getContents());
+	        	
+	        	namesTemp.add(cell.getContents());
+	        	double[] arrayED = new double[sheet.getRows()-2];
+
+	            
+	            	for (int i = 3; i < sheet.getRows(); i++)
+	            {
+	                
+	                Cell cell1 = sheet.getCell(j, i);
+		        	CellType type1 = cell1.getType();
+		        	double value = Double.parseDouble(cell1.getContents());
+		        	arrayED[i-3] = value;
+		        	
+	                
+	            }
+	            	map.put(cell.getContents(),arrayED);
+	            	
+                
+	        }
+	        
+	        mylist.add(map);
+	       
+	        
+	        for (int i = 3; i < sheet.getRows(); i++)
+	        {
+	        Cell cell2 = sheet.getCell(0, i);
+	        CellType type1 = cell2.getType();
+	        geneNames1.add(cell2.getContents());
+	        //Arrays.fill(geneNames1, i-3, sheet.getRows()-3, cell2.getContents());
+	        }
+	        
+	        
+	         
+	    } 
+	    
+	    catch (BiffException e1)
+	    {
+	        e1.printStackTrace();
+	    } catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+	    
+	    return geneNames1;
+	    
+	}*/
+
 }
